@@ -328,6 +328,23 @@ button{cursor:pointer}
   transition:background .15s,transform .12s;z-index:20;
 }
 .call-min-btn:hover{background:rgba(255,255,255,.22);transform:scale(1.05)}
+.call-type-badge{
+  display:inline-flex;align-items:center;gap:6px;padding:4px 14px;border-radius:20px;
+  font-size:12px;font-weight:600;letter-spacing:.3px;margin-bottom:12px;
+}
+.call-type-badge.video{
+  background:rgba(0,168,132,.22);color:#25d366;border:1px solid rgba(37,211,102,.4);
+  box-shadow:0 0 16px rgba(0,168,132,.3);animation:pulseBadge 2s infinite ease-in-out;
+}
+.call-type-badge.voice{
+  background:rgba(255,255,255,.08);color:#8696a0;border:1px solid rgba(255,255,255,.14);
+}
+@keyframes pulseBadge{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(1.03);opacity:.85}}
+.call-av-badge{
+  position:absolute;bottom:-2px;right:-2px;width:30px;height:30px;border-radius:50%;
+  background:#00a884;color:#fff;display:flex;align-items:center;justify-content:center;
+  font-size:14px;box-shadow:0 2px 8px rgba(0,0,0,.5);border:2px solid #1f2c34;z-index:4;
+}
 .call-pulse-wrap{position:relative;display:flex;align-items:center;justify-content:center;margin:18px 0 20px}
 .call-av{
   width:96px;height:96px;border-radius:50%;display:flex;align-items:center;
@@ -741,12 +758,14 @@ button{cursor:pointer}
 <audio id="remote-audio" autoplay playsinline></audio>
 
 <div id="incoming-call-modal" class="call-modal-overlay" style="display:none">
-  <div class="call-card-box">
+  <div class="call-card-box" id="inc-card-box">
+    <div id="inc-call-badge" class="call-type-badge voice">📞 CUỘC GỌI ĐẾN</div>
     <div class="call-pulse-wrap">
       <div class="call-ring"></div>
       <div class="call-ring"></div>
       <div class="call-ring"></div>
       <div class="call-av" id="inc-call-av"></div>
+      <div class="call-av-badge" id="inc-call-av-badge">📞</div>
     </div>
     <div class="call-name" id="inc-call-name">Người dùng</div>
     <div class="call-status" id="inc-call-status">📞 ZapChat • Cuộc gọi thoại đến…</div>
@@ -1845,16 +1864,27 @@ function createPeerConnection() {
     const videoEl = document.getElementById('remote-video');
     const phBox = document.getElementById('video-remote-placeholder');
 
-    if (callState.type === 'video') {
-      if (audioEl) audioEl.muted = true;
+    const isVideoMode = (callState.type === 'video' || e.track.kind === 'video');
+
+    if (isVideoMode) {
+      if (callState.type !== 'video') {
+        callState.type = 'video';
+        showActiveCallModal();
+      }
+      if (audioEl) {
+        if (audioEl.srcObject !== remoteMediaStream) audioEl.srcObject = remoteMediaStream;
+        audioEl.muted = false;
+        audioEl.play().catch(err => console.log('Remote audio play error:', err));
+      }
       if (videoEl) {
-        if (videoEl.srcObject !== remoteMediaStream) {
-          videoEl.srcObject = remoteMediaStream;
-        }
-        videoEl.muted = false;
+        if (videoEl.srcObject !== remoteMediaStream) videoEl.srcObject = remoteMediaStream;
+        videoEl.muted = true;
         videoEl.play().catch(err => console.log('Remote video play error:', err));
         videoEl.onplaying = () => { if (phBox) phBox.style.display = 'none'; };
         videoEl.onloadedmetadata = () => { if (phBox) phBox.style.display = 'none'; };
+      }
+      if (e.track.kind === 'video') {
+        e.track.onunmute = () => { if (phBox) phBox.style.display = 'none'; };
       }
     } else {
       if (audioEl) {
@@ -2043,12 +2073,10 @@ async function getMediaStreamWithFallback(isVideo = false, facing = 'user') {
           const audioStream = await navigator.mediaDevices.getUserMedia({
             audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }
           });
-          toast('⚠️ Không mở được camera. Đã chuyển sang cuộc gọi thoại!');
           return { stream: audioStream, hasMic: true, hasCam: false, isVideoFallback: true };
         } catch (aErr1) {
           try {
             const audioStream2 = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
-            toast('⚠️ Không mở được camera. Đã chuyển sang cuộc gọi thoại!');
             return { stream: audioStream2, hasMic: true, hasCam: false, isVideoFallback: true };
           } catch (aErr2) {
             console.warn('Audio fallback also failed:', aErr2);
@@ -2096,12 +2124,13 @@ async function startCall(type = 'voice') {
   const audioEl = document.getElementById('remote-audio');
   if (audioEl) audioEl.play().catch(() => {});
 
-  const mediaRes = await getMediaStreamWithFallback(type === 'video', callState.facingMode);
+  const isVideo = (type === 'video');
+  const mediaRes = await getMediaStreamWithFallback(isVideo, callState.facingMode);
   if (!mediaRes.stream) {
     return toast('❌ Thiết bị không hỗ trợ kết nối WebRTC!');
   }
 
-  const actualType = (type === 'video' && !mediaRes.isVideoFallback) ? 'video' : 'voice';
+  const actualType = type;
 
   localStream = mediaRes.stream;
   remoteMediaStream = null;
@@ -2126,8 +2155,14 @@ async function startCall(type = 'voice') {
   if (actualType === 'video') {
     const locVid = document.getElementById('local-video');
     if (locVid) {
-      locVid.srcObject = localStream;
-      locVid.play().catch(() => {});
+      if (mediaRes.hasCam) {
+        locVid.srcObject = localStream;
+        locVid.style.opacity = '1';
+        locVid.play().catch(() => {});
+      } else {
+        locVid.srcObject = null;
+        locVid.style.opacity = '0.3';
+      }
     }
   }
 
@@ -2158,7 +2193,9 @@ async function startCall(type = 'voice') {
     }
   }, 45000);
 
-  if (!mediaRes.hasMic) {
+  if (isVideo && !mediaRes.hasCam) {
+    toast('📹 Cuộc gọi video bắt đầu (Camera của bạn tạm tắt)');
+  } else if (!mediaRes.hasMic) {
     if (mediaRes.errorName === 'NotFoundError' || mediaRes.errorName === 'DevicesNotFoundError') {
       toast('🎧 Chưa phát hiện micro. Cuộc gọi đang ở chế độ "Chỉ nghe"!');
     } else if (mediaRes.errorName === 'NotAllowedError' || mediaRes.errorName === 'PermissionDeniedError') {
@@ -2181,7 +2218,7 @@ function onIncomingCall(m) {
     });
   }
 
-  const isVideo = m.callType === 'video';
+  const isVideo = (m.callType === 'video');
   callState.active = true;
   callState.type = isVideo ? 'video' : 'voice';
   callState.status = 'incoming';
@@ -2191,11 +2228,6 @@ function onIncomingCall(m) {
   callState.convId = m.convId;
   callState.isCaller = false;
   callState.pendingOfferSdp = m.sdp;
-
-  const stEl = document.getElementById('inc-call-status');
-  if (stEl) {
-    stEl.textContent = isVideo ? '📹 ZapChat • Cuộc gọi video đến…' : '📞 ZapChat • Cuộc gọi thoại đến…';
-  }
 
   showIncomingCallModal();
   callSounds.playRingtone();
@@ -2217,16 +2249,12 @@ async function acceptIncomingCall() {
   const audioEl = document.getElementById('remote-audio');
   if (audioEl) audioEl.play().catch(() => {});
 
-  const isVideo = callState.type === 'video';
+  const isVideo = (callState.type === 'video');
   const mediaRes = await getMediaStreamWithFallback(isVideo, callState.facingMode);
   if (!mediaRes.stream) {
     toast('❌ Thiết bị không hỗ trợ kết nối WebRTC!');
     rejectIncomingCall();
     return;
-  }
-
-  if (isVideo && mediaRes.isVideoFallback) {
-    callState.type = 'voice';
   }
 
   localStream = mediaRes.stream;
@@ -2246,8 +2274,14 @@ async function acceptIncomingCall() {
   if (callState.type === 'video') {
     const locVid = document.getElementById('local-video');
     if (locVid) {
-      locVid.srcObject = localStream;
-      locVid.play().catch(() => {});
+      if (mediaRes.hasCam) {
+        locVid.srcObject = localStream;
+        locVid.style.opacity = '1';
+        locVid.play().catch(() => {});
+      } else {
+        locVid.srcObject = null;
+        locVid.style.opacity = '0.3';
+      }
     }
   }
 
@@ -2262,13 +2296,16 @@ async function acceptIncomingCall() {
   wsSend({
     type: 'CALL_ANSWER',
     targetUserId: callState.partnerId,
+    callType: callState.type,
     sdp: answer
   });
 
   await flushIceCandidates();
   onCallConnected();
 
-  if (!mediaRes.hasMic) {
+  if (isVideo && !mediaRes.hasCam) {
+    toast('📹 Đã tham gia cuộc gọi video (Camera của bạn tạm tắt)');
+  } else if (!mediaRes.hasMic) {
     toast('🎧 Đã kết nối ở chế độ "Chỉ nghe" (chưa có micro)');
   }
 }
@@ -2439,8 +2476,50 @@ async function toggleCallMic() {
   toast(callState.isMuted ? 'Đã tắt micro 🔇' : 'Đã bật micro 🎙️');
 }
 
-function toggleCallCam() {
-  if (!localStream) return;
+async function toggleCallCam() {
+  if (callState.type !== 'video') return;
+
+  if (!callState.hasCam || !localStream || localStream.getVideoTracks().length === 0) {
+    try {
+      const vidStream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: callState.facingMode }, width: { ideal: 1280 }, height: { ideal: 720 } }
+      });
+      const newTrack = vidStream.getVideoTracks()[0];
+      if (peerConn) {
+        const senders = peerConn.getSenders();
+        const videoSender = senders.find(s => s.track && s.track.kind === 'video');
+        if (videoSender) {
+          await videoSender.replaceTrack(newTrack);
+        } else {
+          peerConn.addTrack(newTrack, localStream || vidStream);
+        }
+      }
+      if (localStream) {
+        localStream.addTrack(newTrack);
+      } else {
+        localStream = vidStream;
+      }
+      callState.hasCam = true;
+      callState.isCamOff = false;
+
+      const locVid = document.getElementById('local-video');
+      if (locVid) {
+        locVid.srcObject = localStream;
+        locVid.style.opacity = '1';
+        locVid.play().catch(() => {});
+      }
+      const btn = document.getElementById('btn-toggle-cam');
+      if (btn) {
+        btn.classList.remove('off');
+        btn.textContent = '📹';
+        btn.title = 'Tắt Camera';
+      }
+      return toast('✅ Đã bật camera thành công!');
+    } catch (e) {
+      return toast('❌ Không thể mở camera: ' + e.message);
+    }
+  }
+
   const videoTracks = localStream.getVideoTracks();
   if (videoTracks.length === 0) return toast('⚠️ Không tìm thấy camera!');
 
@@ -2591,8 +2670,36 @@ function showIncomingCallModal() {
   const modal = document.getElementById('incoming-call-modal');
   const av = document.getElementById('inc-call-av');
   const name = document.getElementById('inc-call-name');
+  const stEl = document.getElementById('inc-call-status');
+  const badge = document.getElementById('inc-call-badge');
+  const avBadge = document.getElementById('inc-call-av-badge');
+  const accBtn = document.getElementById('inc-btn-accept');
+
+  const isVideo = (callState.type === 'video');
+
   if (av) { av.style.background = callState.partnerColor; av.textContent = ini(callState.partnerName); }
   if (name) name.textContent = callState.partnerName;
+
+  if (stEl) {
+    stEl.textContent = isVideo ? '📹 ZapChat • Cuộc gọi video đến…' : '📞 ZapChat • Cuộc gọi thoại đến…';
+  }
+
+  if (badge) {
+    badge.className = 'call-type-badge ' + (isVideo ? 'video' : 'voice');
+    badge.innerHTML = isVideo ? '📹 CUỘC GỌI VIDEO ĐẾN' : '📞 CUỘC GỌI THOẠI ĐẾN';
+  }
+
+  if (avBadge) {
+    avBadge.textContent = isVideo ? '📹' : '📞';
+  }
+
+  if (accBtn) {
+    accBtn.title = isVideo ? 'Trả lời cuộc gọi video' : 'Trả lời cuộc gọi thoại';
+    accBtn.innerHTML = isVideo
+      ? `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><polygon points="23 7 16 12 23 17 23 7"></polygon><rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect></svg>`
+      : `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>`;
+  }
+
   if (modal) modal.style.display = 'flex';
 }
 function hideIncomingCallModal() {
@@ -2617,7 +2724,12 @@ function showActiveCallModal() {
 
   if (callState.type === 'video') {
     if (card) card.classList.add('video-mode');
-    if (camBtn) camBtn.style.display = 'flex';
+    if (camBtn) {
+      camBtn.style.display = 'flex';
+      camBtn.classList.toggle('off', callState.isCamOff);
+      camBtn.textContent = callState.isCamOff ? '📷🚫' : '📹';
+      camBtn.title = callState.isCamOff ? 'Bật Camera' : 'Tắt Camera';
+    }
     if (phBox) phBox.style.display = 'flex';
   } else {
     if (card) card.classList.remove('video-mode', 'fullscreen');

@@ -827,15 +827,15 @@ const activeCalls = new Map(); // userId -> { partnerId, convId, callType, start
 
 function getClientWs(userId) {
   if (userId == null) return null;
-  return clients.get(Number(userId)) || clients.get(String(userId)) || clients.get(userId) || null;
+  return clients.get(String(userId)) || clients.get(userId) || (Number(userId) ? clients.get(Number(userId)) : null);
 }
 
 function onCallOffer(ws, msg, uid) {
   if (!uid) return;
-  const targetId = Number(msg.targetUserId);
+  const targetId = msg.targetUserId ? String(msg.targetUserId) : null;
   const convId   = msg.convId;
   const callType = msg.callType === 'video' ? 'video' : 'voice';
-  if (!targetId || targetId === uid) {
+  if (!targetId || targetId === String(uid)) {
     return wsSend(ws, { type: 'CALL_FAILED', error: 'Người nhận không hợp lệ!' });
   }
 
@@ -844,15 +844,15 @@ function onCallOffer(ws, msg, uid) {
     return wsSend(ws, { type: 'CALL_FAILED', error: 'Người dùng hiện không online!' });
   }
 
-  if (activeCalls.has(targetId)) {
+  if (activeCalls.has(targetId) || activeCalls.has(String(uid))) {
     return wsSend(ws, { type: 'CALL_BUSY', error: 'Người dùng đang bận trong một cuộc gọi khác!' });
   }
 
   const caller = dbGet(`SELECT id, displayName, color FROM users WHERE id=?`, [uid]);
   if (!caller) return;
 
-  activeCalls.set(uid, { partnerId: targetId, convId, callType, startTime: null });
-  activeCalls.set(targetId, { partnerId: uid, convId, callType, startTime: null });
+  activeCalls.set(String(uid), { partnerId: targetId, convId, callType, startTime: null });
+  activeCalls.set(targetId, { partnerId: String(uid), convId, callType, startTime: null });
 
   wsSend(targetWs, {
     type: 'INCOMING_CALL',
@@ -867,18 +867,21 @@ function onCallOffer(ws, msg, uid) {
 
 function onCallAnswer(ws, msg, uid) {
   if (!uid) return;
-  const targetId = Number(msg.targetUserId);
+  const targetId = msg.targetUserId ? String(msg.targetUserId) : null;
   const targetWs = getClientWs(targetId);
 
   const now = Date.now();
-  if (activeCalls.has(uid)) activeCalls.get(uid).startTime = now;
-  if (activeCalls.has(targetId)) activeCalls.get(targetId).startTime = now;
+  if (activeCalls.has(String(uid))) activeCalls.get(String(uid)).startTime = now;
+  if (targetId && activeCalls.has(targetId)) activeCalls.get(targetId).startTime = now;
+
+  const currentCall = activeCalls.get(String(uid));
+  const callType = currentCall?.callType || (msg.callType === 'video' ? 'video' : 'voice');
 
   if (targetWs && targetWs.readyState === 1) {
     wsSend(targetWs, {
       type: 'CALL_ANSWERED',
       fromUserId: uid,
-      callType: activeCalls.get(uid)?.callType || 'voice',
+      callType: callType,
       sdp: msg.sdp
     });
   }
@@ -886,7 +889,7 @@ function onCallAnswer(ws, msg, uid) {
 
 function onCallIce(ws, msg, uid) {
   if (!uid) return;
-  const targetId = Number(msg.targetUserId);
+  const targetId = msg.targetUserId ? String(msg.targetUserId) : null;
   const targetWs = getClientWs(targetId);
   if (targetWs && targetWs.readyState === 1) {
     wsSend(targetWs, {
@@ -899,11 +902,11 @@ function onCallIce(ws, msg, uid) {
 
 function onCallReject(ws, msg, uid) {
   if (!uid) return;
-  const targetId = Number(msg.targetUserId);
+  const targetId = msg.targetUserId ? String(msg.targetUserId) : null;
   const targetWs = getClientWs(targetId);
 
-  const c = activeCalls.get(uid);
-  const partnerId = c ? Number(c.partnerId) : targetId;
+  const c = activeCalls.get(String(uid));
+  const partnerId = c ? String(c.partnerId) : targetId;
   const isVideo = c?.callType === 'video';
   const missedText = isVideo ? 'Cuộc gọi video nhỡ' : 'Cuộc gọi nhỡ';
 
@@ -924,13 +927,13 @@ function onCallReject(ws, msg, uid) {
         senderColor: caller ? caller.color : '#00a884'
       }
     });
-    [uid, partnerId].forEach(id => {
+    [String(uid), partnerId].forEach(id => {
       const s = getClientWs(id);
       if (s && s.readyState === 1) s.send(out);
     });
   }
 
-  activeCalls.delete(uid);
+  activeCalls.delete(String(uid));
   if (partnerId) activeCalls.delete(partnerId);
 
   if (targetWs && targetWs.readyState === 1) {
@@ -945,11 +948,11 @@ function onCallReject(ws, msg, uid) {
 
 function onCallEnd(ws, msg, uid) {
   if (!uid) return;
-  const c = activeCalls.get(uid);
-  const targetId = Number(msg?.targetUserId || c?.partnerId);
+  const c = activeCalls.get(String(uid));
+  const targetId = (msg?.targetUserId || c?.partnerId) ? String(msg?.targetUserId || c?.partnerId) : null;
 
   if (c) {
-    const partnerId = Number(c.partnerId);
+    const partnerId = String(c.partnerId);
     const isVideo = c.callType === 'video';
     const durationSec = c.startTime ? Math.round((Date.now() - c.startTime) / 1000) : 0;
     if (c.convId) {
@@ -975,13 +978,13 @@ function onCallEnd(ws, msg, uid) {
           senderColor: sender ? sender.color : '#00a884'
         }
       });
-      [uid, partnerId].forEach(id => {
+      [String(uid), partnerId].forEach(id => {
         const s = getClientWs(id);
         if (s && s.readyState === 1) s.send(out);
       });
     }
 
-    activeCalls.delete(uid);
+    activeCalls.delete(String(uid));
     activeCalls.delete(partnerId);
 
     const targetWs = getClientWs(partnerId);
