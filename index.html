@@ -1826,24 +1826,25 @@ let _activeVisualizerStream = null;
 let remoteAudioCtx = null;
 let remoteAudioSource = null;
 
-function playStreamViaWebAudio(stream) {
-  try {
-    const AudioCtx = window.AudioContext || window.webkitAudioContext;
-    if (!AudioCtx) return;
-    if (!remoteAudioCtx || remoteAudioCtx.state === 'closed') {
-      remoteAudioCtx = new AudioCtx();
-    }
-    if (remoteAudioCtx.state === 'suspended') {
-      remoteAudioCtx.resume().catch(() => {});
-    }
-    if (remoteAudioSource) {
-      try { remoteAudioSource.disconnect(); } catch(_) {}
-    }
-    remoteAudioSource = remoteAudioCtx.createMediaStreamSource(stream);
-    remoteAudioSource.connect(remoteAudioCtx.destination);
-    console.log('[WebRTC] Đã kết nối âm thanh qua Web Audio API destination');
-  } catch (e) {
-    console.warn('[WebRTC] playStreamViaWebAudio error:', e);
+function primeAudioElement() {
+  const audioEl = document.getElementById('remote-audio');
+  if (!audioEl) return;
+  audioEl.muted = false;
+  audioEl.volume = 1.0;
+  if (!audioEl.srcObject) {
+    try {
+      audioEl.src = 'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA';
+      const p = audioEl.play();
+      if (p !== undefined) {
+        p.then(() => {
+          audioEl.pause();
+          audioEl.removeAttribute('src');
+          audioEl.load();
+        }).catch(() => {});
+      }
+    } catch(_) {}
+  } else {
+    audioEl.play().catch(() => {});
   }
 }
 
@@ -1861,8 +1862,8 @@ function createPeerConnection() {
           'turn:openrelay.metered.ca:443',
           'turn:openrelay.metered.ca:443?transport=tcp'
         ],
-        username: 'openrelay',
-        credential: 'openrelay'
+        username: 'openrelayproject',
+        credential: 'openrelayproject'
       }
     ],
     iceCandidatePoolSize: 10
@@ -1880,11 +1881,21 @@ function createPeerConnection() {
 
   pc.ontrack = e => {
     console.log('[WebRTC] ontrack kind=' + e.track.kind, e);
-    const stream = (e.streams && e.streams[0]) ? e.streams[0] : new MediaStream([e.track]);
-    remoteMediaStream = stream;
+    e.track.enabled = true;
 
-    if (e.track.kind === 'audio') {
-      e.track.enabled = true;
+    // Giữ một MediaStream duy nhất chứa tất cả các track
+    if (!remoteMediaStream) {
+      remoteMediaStream = new MediaStream();
+    }
+    if (!remoteMediaStream.getTracks().some(t => t.id === e.track.id)) {
+      remoteMediaStream.addTrack(e.track);
+    }
+    if (e.streams && e.streams[0]) {
+      e.streams[0].getTracks().forEach(t => {
+        if (!remoteMediaStream.getTracks().some(existing => existing.id === t.id)) {
+          remoteMediaStream.addTrack(t);
+        }
+      });
     }
 
     const audioEl = document.getElementById('remote-audio');
@@ -1898,17 +1909,10 @@ function createPeerConnection() {
         callState.type = 'video';
         showActiveCallModal();
       }
-      if (audioEl) {
-        audioEl.srcObject = stream;
-        audioEl.volume = 1.0;
-        audioEl.muted = false;
-        audioEl.play().catch(err => {
-          console.warn('Remote audio play error in video mode:', err);
-          playStreamViaWebAudio(stream);
-        });
-      }
       if (videoEl) {
-        videoEl.srcObject = stream;
+        if (videoEl.srcObject !== remoteMediaStream) {
+          videoEl.srcObject = remoteMediaStream;
+        }
         videoEl.muted = true;
         videoEl.play().catch(err => console.log('Remote video play error:', err));
         videoEl.onplaying = () => { if (phBox) phBox.style.display = 'none'; };
@@ -1917,21 +1921,22 @@ function createPeerConnection() {
       if (e.track.kind === 'video') {
         e.track.onunmute = () => { if (phBox) phBox.style.display = 'none'; };
       }
-    } else {
-      if (audioEl) {
-        audioEl.srcObject = stream;
-        audioEl.volume = 1.0;
-        audioEl.muted = false;
-        audioEl.play().catch(err => {
-          console.warn('Remote audio play error in voice mode:', err);
-          playStreamViaWebAudio(stream);
-        });
-      }
     }
 
-    // Tự động kết nối âm thanh phòng ngừa autoplay policy
-    playStreamViaWebAudio(stream);
-    onCallConnected();
+    if (audioEl) {
+      if (audioEl.srcObject !== remoteMediaStream) {
+        audioEl.srcObject = remoteMediaStream;
+      }
+      audioEl.muted = false;
+      audioEl.volume = 1.0;
+      audioEl.play().catch(err => {
+        console.warn('Remote audio play error:', err);
+      });
+    }
+
+    if (pc.iceConnectionState === 'connected' || pc.iceConnectionState === 'completed' || pc.connectionState === 'connected') {
+      onCallConnected();
+    }
   };
 
   pc.onconnectionstatechange = () => {
@@ -2179,9 +2184,8 @@ async function startCall(type = 'voice') {
   if (!f.online) return toast('⚠️ ' + f.displayName + ' hiện không online!');
   if (callState.active) return toast('Bạn đang trong cuộc gọi khác!');
 
-  // Pre-unlock audio element
-  const audioEl = document.getElementById('remote-audio');
-  if (audioEl) audioEl.play().catch(() => {});
+  // Prime/unlock audio element on user gesture
+  primeAudioElement();
 
   const isVideo = (type === 'video');
   const mediaRes = await getMediaStreamWithFallback(isVideo, callState.facingMode);
@@ -2189,7 +2193,7 @@ async function startCall(type = 'voice') {
     return toast('❌ Thiết bị không hỗ trợ kết nối WebRTC!');
   }
 
-  const actualType = type;
+  const actualType = isVideo ? 'video' : 'voice';
 
   localStream = mediaRes.stream;
   remoteMediaStream = null;
@@ -2229,7 +2233,10 @@ async function startCall(type = 'voice') {
     startMicVisualizer(localStream);
   }
 
-  const offer = await peerConn.createOffer();
+  const offer = await peerConn.createOffer({
+    offerToReceiveAudio: true,
+    offerToReceiveVideo: isVideo
+  });
   await peerConn.setLocalDescription(offer);
 
   wsSend({
@@ -2241,7 +2248,9 @@ async function startCall(type = 'voice') {
   });
 
   showActiveCallModal();
-  updateCallStatusText(mediaRes.hasMic ? 'Đang đổ chuông…' : 'Đang đổ chuông… (Chế độ chỉ nghe 🎧)');
+  updateCallStatusText(actualType === 'video'
+    ? (mediaRes.hasCam ? 'Đang gọi video…' : 'Đang gọi video… (Camera tắt)')
+    : (mediaRes.hasMic ? 'Đang đổ chuông…' : 'Đang đổ chuông… (Chế độ chỉ nghe 🎧)'));
   callSounds.playRingback();
 
   clearTimeout(callState.ringTimeout);
@@ -2277,7 +2286,10 @@ function onIncomingCall(m) {
     });
   }
 
-  const isVideo = (m.callType === 'video');
+  const sdpStr = typeof m.sdp === 'string' ? m.sdp : (m.sdp?.sdp || '');
+  const hasVideoInSdp = sdpStr.includes('m=video') && !sdpStr.includes('m=video 0');
+  const isVideo = (m.callType === 'video') || hasVideoInSdp;
+
   callState.active = true;
   callState.type = isVideo ? 'video' : 'voice';
   callState.status = 'incoming';
@@ -2304,9 +2316,8 @@ async function acceptIncomingCall() {
   callSounds.stop();
   hideIncomingCallModal();
 
-  // Pre-unlock audio element
-  const audioEl = document.getElementById('remote-audio');
-  if (audioEl) audioEl.play().catch(() => {});
+  // Prime/unlock audio element on user gesture
+  primeAudioElement();
 
   const isVideo = (callState.type === 'video');
   const mediaRes = await getMediaStreamWithFallback(isVideo, callState.facingMode);
@@ -2325,7 +2336,9 @@ async function acceptIncomingCall() {
   callState.status = 'connecting';
 
   showActiveCallModal();
-  updateCallStatusText(mediaRes.hasMic ? 'Đang kết nối…' : 'Đang kết nối… (Chỉ nghe 🎧)');
+  updateCallStatusText(isVideo
+    ? (mediaRes.hasCam ? 'Đang kết nối video…' : 'Đang kết nối video… (Camera tạm tắt)')
+    : (mediaRes.hasMic ? 'Đang kết nối…' : 'Đang kết nối… (Chỉ nghe 🎧)'));
 
   peerConn = createPeerConnection();
   localStream.getTracks().forEach(track => peerConn.addTrack(track, localStream));
@@ -2349,7 +2362,10 @@ async function acceptIncomingCall() {
   }
 
   await peerConn.setRemoteDescription(new RTCSessionDescription(callState.pendingOfferSdp));
-  const answer = await peerConn.createAnswer();
+  const answer = await peerConn.createAnswer({
+    offerToReceiveAudio: true,
+    offerToReceiveVideo: isVideo
+  });
   await peerConn.setLocalDescription(answer);
 
   wsSend({
@@ -2666,11 +2682,20 @@ function endCall(fromRemote = false, message = null) {
   }
   remoteMediaStream = null;
   const audioEl = document.getElementById('remote-audio');
-  if (audioEl) audioEl.srcObject = null;
+  if (audioEl) {
+    audioEl.pause();
+    audioEl.srcObject = null;
+  }
   const remVid = document.getElementById('remote-video');
-  if (remVid) remVid.srcObject = null;
+  if (remVid) {
+    remVid.pause();
+    remVid.srcObject = null;
+  }
   const locVid = document.getElementById('local-video');
-  if (locVid) locVid.srcObject = null;
+  if (locVid) {
+    locVid.pause();
+    locVid.srcObject = null;
+  }
 
   hideActiveCallModal();
   hideIncomingCallModal();

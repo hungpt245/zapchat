@@ -506,7 +506,13 @@ const httpServer = http.createServer((req, res) => {
   fs.readFile(fp,(err,content)=>{
     if(err){res.writeHead(404);return res.end('Not Found');}
     const ext=path.extname(fp).toLowerCase();
-    res.writeHead(200,{'Content-Type':MIME[ext]||'text/plain;charset=utf-8'});
+    const headers = { 'Content-Type': MIME[ext] || 'text/plain;charset=utf-8' };
+    if (ext === '.html') {
+      headers['Cache-Control'] = 'no-cache, no-store, must-revalidate';
+      headers['Pragma'] = 'no-cache';
+      headers['Expires'] = '0';
+    }
+    res.writeHead(200, headers);
     res.end(content);
   });
 });
@@ -834,7 +840,11 @@ function onCallOffer(ws, msg, uid) {
   if (!uid) return;
   const targetId = msg.targetUserId ? String(msg.targetUserId) : null;
   const convId   = msg.convId;
-  const callType = msg.callType === 'video' ? 'video' : 'voice';
+
+  const sdpStr = typeof msg.sdp === 'string' ? msg.sdp : (msg.sdp?.sdp || '');
+  const hasVideoInSdp = sdpStr.includes('m=video') && !sdpStr.includes('m=video 0');
+  const callType = (msg.callType === 'video' || hasVideoInSdp) ? 'video' : 'voice';
+
   if (!targetId || targetId === String(uid)) {
     return wsSend(ws, { type: 'CALL_FAILED', error: 'Người nhận không hợp lệ!' });
   }
@@ -875,7 +885,9 @@ function onCallAnswer(ws, msg, uid) {
   if (targetId && activeCalls.has(targetId)) activeCalls.get(targetId).startTime = now;
 
   const currentCall = activeCalls.get(String(uid));
-  const callType = currentCall?.callType || (msg.callType === 'video' ? 'video' : 'voice');
+  const sdpStr = typeof msg.sdp === 'string' ? msg.sdp : (msg.sdp?.sdp || '');
+  const hasVideoInSdp = sdpStr.includes('m=video') && !sdpStr.includes('m=video 0');
+  const callType = currentCall?.callType || (msg.callType === 'video' || hasVideoInSdp ? 'video' : 'voice');
 
   if (targetWs && targetWs.readyState === 1) {
     wsSend(targetWs, {
