@@ -1822,6 +1822,30 @@ let disconnectGraceTimeout = null;
 let micAudioCtx = null;
 let micAnalyser = null;
 let micVisualizerInterval = null;
+let _activeVisualizerStream = null;
+let remoteAudioCtx = null;
+let remoteAudioSource = null;
+
+function playStreamViaWebAudio(stream) {
+  try {
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    if (!AudioCtx) return;
+    if (!remoteAudioCtx || remoteAudioCtx.state === 'closed') {
+      remoteAudioCtx = new AudioCtx();
+    }
+    if (remoteAudioCtx.state === 'suspended') {
+      remoteAudioCtx.resume().catch(() => {});
+    }
+    if (remoteAudioSource) {
+      try { remoteAudioSource.disconnect(); } catch(_) {}
+    }
+    remoteAudioSource = remoteAudioCtx.createMediaStreamSource(stream);
+    remoteAudioSource.connect(remoteAudioCtx.destination);
+    console.log('[WebRTC] Đã kết nối âm thanh qua Web Audio API destination');
+  } catch (e) {
+    console.warn('[WebRTC] playStreamViaWebAudio error:', e);
+  }
+}
 
 function createPeerConnection() {
   const pc = new RTCPeerConnection({
@@ -1829,8 +1853,19 @@ function createPeerConnection() {
       { urls: 'stun:stun.l.google.com:19302' },
       { urls: 'stun:stun1.l.google.com:19302' },
       { urls: 'stun:stun2.l.google.com:19302' },
-      { urls: 'stun:stun.cloudflare.com:3478' }
-    ]
+      { urls: 'stun:stun.cloudflare.com:3478' },
+      {
+        urls: [
+          'stun:openrelay.metered.ca:80',
+          'turn:openrelay.metered.ca:80',
+          'turn:openrelay.metered.ca:443',
+          'turn:openrelay.metered.ca:443?transport=tcp'
+        ],
+        username: 'openrelay',
+        credential: 'openrelay'
+      }
+    ],
+    iceCandidatePoolSize: 10
   });
 
   pc.onicecandidate = e => {
@@ -1844,20 +1879,12 @@ function createPeerConnection() {
   };
 
   pc.ontrack = e => {
-    console.log('[WebRTC] ontrack:', e.track.kind);
-    if (!remoteMediaStream) {
-      remoteMediaStream = new MediaStream();
-    }
-    if (e.streams && e.streams[0]) {
-      e.streams[0].getTracks().forEach(t => {
-        if (!remoteMediaStream.getTracks().includes(t)) {
-          remoteMediaStream.addTrack(t);
-        }
-      });
-    } else if (e.track) {
-      if (!remoteMediaStream.getTracks().includes(e.track)) {
-        remoteMediaStream.addTrack(e.track);
-      }
+    console.log('[WebRTC] ontrack kind=' + e.track.kind, e);
+    const stream = (e.streams && e.streams[0]) ? e.streams[0] : new MediaStream([e.track]);
+    remoteMediaStream = stream;
+
+    if (e.track.kind === 'audio') {
+      e.track.enabled = true;
     }
 
     const audioEl = document.getElementById('remote-audio');
@@ -1872,12 +1899,16 @@ function createPeerConnection() {
         showActiveCallModal();
       }
       if (audioEl) {
-        if (audioEl.srcObject !== remoteMediaStream) audioEl.srcObject = remoteMediaStream;
+        audioEl.srcObject = stream;
+        audioEl.volume = 1.0;
         audioEl.muted = false;
-        audioEl.play().catch(err => console.log('Remote audio play error:', err));
+        audioEl.play().catch(err => {
+          console.warn('Remote audio play error in video mode:', err);
+          playStreamViaWebAudio(stream);
+        });
       }
       if (videoEl) {
-        if (videoEl.srcObject !== remoteMediaStream) videoEl.srcObject = remoteMediaStream;
+        videoEl.srcObject = stream;
         videoEl.muted = true;
         videoEl.play().catch(err => console.log('Remote video play error:', err));
         videoEl.onplaying = () => { if (phBox) phBox.style.display = 'none'; };
@@ -1888,13 +1919,19 @@ function createPeerConnection() {
       }
     } else {
       if (audioEl) {
+        audioEl.srcObject = stream;
+        audioEl.volume = 1.0;
         audioEl.muted = false;
-        if (audioEl.srcObject !== remoteMediaStream) {
-          audioEl.srcObject = remoteMediaStream;
-        }
-        audioEl.play().catch(err => console.log('Remote audio play error:', err));
+        audioEl.play().catch(err => {
+          console.warn('Remote audio play error in voice mode:', err);
+          playStreamViaWebAudio(stream);
+        });
       }
     }
+
+    // Tự động kết nối âm thanh phòng ngừa autoplay policy
+    playStreamViaWebAudio(stream);
+    onCallConnected();
   };
 
   pc.onconnectionstatechange = () => {
@@ -1908,14 +1945,16 @@ function createPeerConnection() {
     } else if (pc.connectionState === 'disconnected') {
       if (!disconnectGraceTimeout) {
         console.warn('[WebRTC] Tạm thời mất kết nối, đang chờ tự kết nối lại...');
+        updateCallStatusText('Mạng yếu, đang kết nối lại…');
         disconnectGraceTimeout = setTimeout(() => {
           if (peerConn && (peerConn.connectionState === 'disconnected' || peerConn.connectionState === 'failed')) {
             endCall(false, 'Kết nối cuộc gọi bị gián đoạn do mất mạng');
           }
-        }, 8000);
+        }, 10000);
       }
     } else if (pc.connectionState === 'failed') {
-      endCall(false, 'Không thể thiết lập kết nối cuộc gọi');
+      console.warn('[WebRTC] connectionState failed');
+      endCall(false, 'Không thể thiết lập kết nối đàm thoại P2P');
     }
   };
 
@@ -1927,6 +1966,11 @@ function createPeerConnection() {
         disconnectGraceTimeout = null;
       }
       onCallConnected();
+    } else if (pc.iceConnectionState === 'failed') {
+      console.warn('[WebRTC] ICE state failed, trying restart ICE...');
+      if (peerConn && peerConn.restartIce) {
+        try { peerConn.restartIce(); } catch(_) {}
+      }
     }
   };
 
@@ -1937,11 +1981,13 @@ async function handleRemoteIce(candidate) {
   if (!candidate) return;
   if (peerConn && peerConn.remoteDescription && peerConn.remoteDescription.type) {
     try {
-      if (candidate.candidate) {
-        await peerConn.addIceCandidate(new RTCIceCandidate(candidate));
-      }
+      await peerConn.addIceCandidate(candidate);
     } catch (e) {
-      console.warn('addIceCandidate error:', e);
+      try {
+        await peerConn.addIceCandidate(new RTCIceCandidate(candidate));
+      } catch (e2) {
+        console.warn('addIceCandidate error:', e2);
+      }
     }
   } else {
     pendingIceCandidates.push(candidate);
@@ -1952,12 +1998,15 @@ async function flushIceCandidates() {
   if (!peerConn) return;
   while (pendingIceCandidates.length > 0) {
     const cand = pendingIceCandidates.shift();
+    if (!cand) continue;
     try {
-      if (cand && cand.candidate) {
-        await peerConn.addIceCandidate(new RTCIceCandidate(cand));
-      }
+      await peerConn.addIceCandidate(cand);
     } catch (e) {
-      console.warn('flush candidate error:', e);
+      try {
+        await peerConn.addIceCandidate(new RTCIceCandidate(cand));
+      } catch (e2) {
+        console.warn('flush candidate error:', e2);
+      }
     }
   }
 }
@@ -1974,7 +2023,8 @@ function startMicVisualizer(stream) {
     if (micAudioCtx.state === 'suspended') {
       micAudioCtx.resume().catch(() => {});
     }
-    const source = micAudioCtx.createMediaStreamSource(new MediaStream([audioTrack]));
+    _activeVisualizerStream = stream; // Giữ tham chiếu tránh Chrome GC dọn dẹp gây mute mic
+    const source = micAudioCtx.createMediaStreamSource(stream);
     micAnalyser = micAudioCtx.createAnalyser();
     micAnalyser.fftSize = 32;
     micAnalyser.smoothingTimeConstant = 0.4;
@@ -2019,6 +2069,7 @@ function stopMicVisualizer() {
     micAudioCtx = null;
     micAnalyser = null;
   }
+  _activeVisualizerStream = null;
   const waveBars = document.querySelectorAll('.call-wave-bar');
   waveBars.forEach(b => {
     b.style.height = '6px';
@@ -2061,11 +2112,13 @@ async function getMediaStreamWithFallback(isVideo = false, facing = 'user') {
         audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
         video: { facingMode: { ideal: facing }, width: { ideal: 1280 }, height: { ideal: 720 } }
       });
+      stream.getAudioTracks().forEach(t => t.enabled = true);
       return { stream, hasMic: true, hasCam: true, isVideoFallback: false };
     } catch (err1) {
       console.warn('Video constraints fall back to basic video+audio:', err1);
       try {
         const stream2 = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
+        stream2.getAudioTracks().forEach(t => t.enabled = true);
         return { stream: stream2, hasMic: true, hasCam: true, isVideoFallback: false };
       } catch (err2) {
         console.warn('Video acquisition failed, trying audio only:', err2);
@@ -2073,13 +2126,16 @@ async function getMediaStreamWithFallback(isVideo = false, facing = 'user') {
           const audioStream = await navigator.mediaDevices.getUserMedia({
             audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }
           });
+          audioStream.getAudioTracks().forEach(t => t.enabled = true);
           return { stream: audioStream, hasMic: true, hasCam: false, isVideoFallback: true };
         } catch (aErr1) {
           try {
             const audioStream2 = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+            audioStream2.getAudioTracks().forEach(t => t.enabled = true);
             return { stream: audioStream2, hasMic: true, hasCam: false, isVideoFallback: true };
           } catch (aErr2) {
             console.warn('Audio fallback also failed:', aErr2);
+            toast('⚠️ Không thể mở Micro! Vui lòng cho phép quyền Micro trên trình duyệt (🔒 cạnh URL).');
             const synth = createSyntheticAudioStream();
             return { stream: synth, hasMic: false, hasCam: false, isVideoFallback: true, errorName: aErr2.name };
           }
@@ -2094,14 +2150,17 @@ async function getMediaStreamWithFallback(isVideo = false, facing = 'user') {
       audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
       video: false
     });
+    stream.getAudioTracks().forEach(t => t.enabled = true);
     return { stream, hasMic: true, hasCam: false, isVideoFallback: false };
   } catch (err1) {
     console.warn('Enhanced audio failed, trying simple audio: true:', err1);
     try {
       const stream2 = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+      stream2.getAudioTracks().forEach(t => t.enabled = true);
       return { stream: stream2, hasMic: true, hasCam: false, isVideoFallback: false };
     } catch (err2) {
       console.warn('getUserMedia Audio error:', err2.name, err2.message);
+      toast('⚠️ Không thể mở Micro! Vui lòng bấm 🔒 trên thanh URL để cho phép quyền truy cập Micro.');
       const synth = createSyntheticAudioStream();
       return { stream: synth, hasMic: false, hasCam: false, isVideoFallback: false, errorName: err2.name };
     }
@@ -2301,7 +2360,7 @@ async function acceptIncomingCall() {
   });
 
   await flushIceCandidates();
-  onCallConnected();
+  updateCallStatusText('Đang kết nối tín hiệu…');
 
   if (isVideo && !mediaRes.hasCam) {
     toast('📹 Đã tham gia cuộc gọi video (Camera của bạn tạm tắt)');
@@ -2331,7 +2390,7 @@ async function onCallAnswered(m) {
   if (!peerConn) return;
   await peerConn.setRemoteDescription(new RTCSessionDescription(m.sdp));
   await flushIceCandidates();
-  onCallConnected();
+  updateCallStatusText('Đang kết nối tín hiệu…');
 }
 
 function onCallIceMsg(m) {
