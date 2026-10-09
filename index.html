@@ -298,26 +298,36 @@ button{cursor:pointer}
 }
 .backbtn{display:none}
 
-/* ─── VOICE CALL ─────────────────────────────── */
+/* ─── CALLS (VOICE & VIDEO) ──────────────────── */
 .call-modal-overlay{
-  position:fixed;inset:0;background:rgba(11,20,26,.82);backdrop-filter:blur(14px);
-  z-index:600;display:flex;align-items:center;justify-content:center;padding:20px;
+  position:fixed;inset:0;background:rgba(11,20,26,.86);backdrop-filter:blur(16px);
+  z-index:600;display:flex;align-items:center;justify-content:center;padding:16px;
   animation:fadeIn .2s ease;
 }
 .call-card-box{
   background:#1f2c34;border-radius:24px;width:100%;max-width:380px;
-  box-shadow:0 12px 48px rgba(0,0,0,.5);border:1px solid rgba(255,255,255,.08);
+  box-shadow:0 16px 50px rgba(0,0,0,.6);border:1px solid rgba(255,255,255,.08);
   overflow:hidden;display:flex;flex-direction:column;align-items:center;
   padding:32px 24px 28px;text-align:center;position:relative;
+  transition:all .3s cubic-bezier(.22,.61,.36,1);
   animation:slideUp .25s cubic-bezier(.22,.61,.36,1);
 }
-.call-min-btn{
-  position:absolute;top:16px;right:16px;width:32px;height:32px;border-radius:50%;
-  border:none;background:rgba(255,255,255,.08);color:#fff;font-size:14px;
-  display:flex;align-items:center;justify-content:center;cursor:pointer;
-  transition:background .15s;
+.call-card-box.video-mode{
+  max-width:900px;width:95vw;height:580px;max-height:88vh;
+  padding:0;background:#0b141a;border-radius:22px;border:1px solid rgba(255,255,255,.12);
+  justify-content:flex-end;
 }
-.call-min-btn:hover{background:rgba(255,255,255,.18)}
+.call-card-box.video-mode.fullscreen{
+  max-width:100vw;width:100vw;height:100vh;max-height:100vh;
+  border-radius:0;border:none;
+}
+.call-min-btn{
+  position:absolute;top:16px;right:16px;width:34px;height:34px;border-radius:50%;
+  border:none;background:rgba(255,255,255,.1);color:#fff;font-size:15px;
+  display:flex;align-items:center;justify-content:center;cursor:pointer;
+  transition:background .15s,transform .12s;z-index:20;
+}
+.call-min-btn:hover{background:rgba(255,255,255,.22);transform:scale(1.05)}
 .call-pulse-wrap{position:relative;display:flex;align-items:center;justify-content:center;margin:18px 0 20px}
 .call-av{
   width:96px;height:96px;border-radius:50%;display:flex;align-items:center;
@@ -333,7 +343,7 @@ button{cursor:pointer}
 .call-ring:nth-child(3){animation-delay:1.3s}
 @keyframes callRipple{0%{transform:scale(1);opacity:.85}100%{transform:scale(2.3);opacity:0}}
 .call-name{font-size:20px;font-weight:700;color:#fff;margin-bottom:6px;max-width:280px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.call-status{font-size:13.5px;color:#8696a0;display:flex;align-items:center;gap:6px;margin-bottom:12px}
+.call-status{font-size:13.5px;color:#8696a0;display:flex;align-items:center;justify-content:center;gap:6px;margin-bottom:12px}
 .call-timer{font-size:18px;font-weight:600;color:var(--green);font-variant-numeric:tabular-nums;margin-bottom:16px}
 .call-waves{display:flex;align-items:center;justify-content:center;gap:4px;height:24px;margin-bottom:20px}
 .call-wave-bar{width:4px;border-radius:3px;background:var(--green);height:6px;transition:height .15s ease}
@@ -344,24 +354,72 @@ button{cursor:pointer}
 .call-waves.active .call-wave-bar:nth-child(4){animation-delay:.2s}
 .call-waves.active .call-wave-bar:nth-child(5){animation-delay:.4s}
 @keyframes waveDance{0%{height:6px}100%{height:24px}}
-.call-actions{display:flex;align-items:center;justify-content:center;gap:20px;width:100%;margin-top:8px}
+
+/* Video Container & Streams */
+.call-video-wrap{
+  position:absolute;inset:0;width:100%;height:100%;background:#091217;
+  overflow:hidden;display:none;align-items:center;justify-content:center;
+}
+.call-card-box.video-mode .call-video-wrap{display:flex}
+.call-card-box.video-mode .call-pulse-wrap,
+.call-card-box.video-mode .call-waves{display:none}
+.remote-video{
+  width:100%;height:100%;object-fit:cover;background:#0b141a;display:none;
+}
+.call-card-box.video-mode #remote-video{display:block !important}
+.local-video{
+  position:absolute;top:16px;right:16px;width:150px;height:200px;
+  max-width:26vw;max-height:28vh;object-fit:cover;border-radius:14px;
+  border:2px solid rgba(255,255,255,.3);box-shadow:0 8px 30px rgba(0,0,0,.6);
+  z-index:15;background:#182229;transform:scaleX(-1);transition:transform .2s,border-color .2s,opacity .2s;
+  display:none;
+}
+.call-card-box.video-mode #local-video{display:block !important}
+.video-remote-placeholder{
+  position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:12px;z-index:12;background:#091217;
+}
+.video-placeholder-txt{color:#8696a0;font-size:14px;letter-spacing:.3px}
+.video-overlay-top{
+  position:absolute;top:0;left:0;right:0;padding:16px 20px;
+  background:linear-gradient(to bottom, rgba(0,0,0,.75), transparent);
+  display:flex;align-items:center;justify-content:space-between;
+  z-index:18;pointer-events:none;
+}
+.video-top-info{display:flex;flex-direction:column;align-items:flex-start;text-shadow:0 2px 8px rgba(0,0,0,.8)}
+.video-top-name{font-size:16px;font-weight:700;color:#fff}
+.video-top-timer{font-size:13px;font-weight:600;color:var(--green);font-variant-numeric:tabular-nums}
+.video-top-btns{display:flex;align-items:center;gap:8px;pointer-events:auto}
+.video-ctrl-top-btn{
+  width:34px;height:34px;border-radius:50%;border:none;background:rgba(0,0,0,.45);
+  backdrop-filter:blur(8px);color:#fff;font-size:14px;display:flex;align-items:center;
+  justify-content:center;cursor:pointer;transition:background .15s,transform .12s;
+}
+.video-ctrl-top-btn:hover{background:rgba(255,255,255,.2);transform:scale(1.05)}
+
+.call-actions{display:flex;align-items:center;justify-content:center;gap:16px;width:100%;margin-top:8px;z-index:20}
+.call-card-box.video-mode .call-actions{
+  position:absolute;bottom:0;left:0;right:0;padding:24px 20px 20px;
+  background:linear-gradient(to top, rgba(0,0,0,.85) 0%, rgba(0,0,0,.4) 60%, transparent 100%);
+  margin:0;gap:14px;
+}
 .call-btn{
-  width:56px;height:56px;border-radius:50%;border:none;display:flex;align-items:center;
-  justify-content:center;font-size:22px;cursor:pointer;transition:transform .12s,background .15s,box-shadow .15s;
+  width:52px;height:52px;border-radius:50%;border:none;display:flex;align-items:center;
+  justify-content:center;font-size:20px;cursor:pointer;transition:transform .12s,background .15s,box-shadow .15s;
 }
 .call-btn:active{transform:scale(.92)}
 .call-btn-accept{background:#00a884;color:#fff;box-shadow:0 4px 20px rgba(0,168,132,.45)}
 .call-btn-accept:hover{background:#008f6f}
 .call-btn-end{background:#ef5350;color:#fff;box-shadow:0 4px 20px rgba(239,83,80,.45)}
 .call-btn-end:hover{background:#e53935}
-.call-btn-ctrl{background:rgba(255,255,255,.12);color:#fff}
-.call-btn-ctrl:hover{background:rgba(255,255,255,.22)}
-.call-btn-ctrl.muted{background:#ef5350;color:#fff}
+.call-btn-ctrl{background:rgba(255,255,255,.14);backdrop-filter:blur(8px);color:#fff}
+.call-btn-ctrl:hover{background:rgba(255,255,255,.26)}
+.call-btn-ctrl.muted, .call-btn-ctrl.off{background:#ef5350;color:#fff}
 
 /* Floating Mini Bar */
 #call-mini-bar{
-  position:fixed;top:16px;right:20px;background:rgba(17,27,33,.92);backdrop-filter:blur(16px);
-  border:1px solid rgba(255,255,255,.12);box-shadow:0 8px 32px rgba(0,0,0,.45);
+  position:fixed;top:16px;right:20px;background:rgba(17,27,33,.94);backdrop-filter:blur(16px);
+  border:1px solid rgba(255,255,255,.14);box-shadow:0 8px 32px rgba(0,0,0,.5);
   border-radius:40px;padding:6px 14px;display:none;align-items:center;gap:12px;
   color:#fff;z-index:550;animation:slideDown .2s cubic-bezier(.22,.61,.36,1);
 }
@@ -584,7 +642,12 @@ button{cursor:pointer}
             <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path>
           </svg>
         </button>
-        <button class="ib" onclick="toast('Gọi video đang phát triển 🚧')">📹</button>
+        <button class="ib" id="btn-call-video" title="Gọi video" onclick="startVideoCall()" style="color:var(--green)">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round">
+            <polygon points="23 7 16 12 23 17 23 7"></polygon>
+            <rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect>
+          </svg>
+        </button>
         <button class="ib" onclick="toast('Thông tin đang phát triển 🚧')">ℹ️</button>
       </div>
       <div id="msgs"></div>
@@ -674,8 +737,8 @@ button{cursor:pointer}
 
 <div id="toast"></div>
 
-<!-- ─── VOICE CALL MODALS & AUDIO ──────────────── -->
-<audio id="remote-audio" autoplay playsinline style="display:none"></audio>
+<!-- ─── CALL MODALS & MEDIA ──────────────── -->
+<audio id="remote-audio" autoplay playsinline></audio>
 
 <div id="incoming-call-modal" class="call-modal-overlay" style="display:none">
   <div class="call-card-box">
@@ -686,7 +749,7 @@ button{cursor:pointer}
       <div class="call-av" id="inc-call-av"></div>
     </div>
     <div class="call-name" id="inc-call-name">Người dùng</div>
-    <div class="call-status">📞 ZapChat • Cuộc gọi thoại đến…</div>
+    <div class="call-status" id="inc-call-status">📞 ZapChat • Cuộc gọi thoại đến…</div>
     <div class="call-actions">
       <button class="call-btn call-btn-end" onclick="rejectIncomingCall()" title="Từ chối">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
@@ -694,8 +757,8 @@ button{cursor:pointer}
           <line x1="6" y1="6" x2="18" y2="18"></line>
         </svg>
       </button>
-      <button class="call-btn call-btn-accept" onclick="acceptIncomingCall()" title="Trả lời">
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+      <button class="call-btn call-btn-accept" id="inc-btn-accept" onclick="acceptIncomingCall()" title="Trả lời">
+        <svg id="inc-accept-icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
           <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path>
         </svg>
       </button>
@@ -704,8 +767,30 @@ button{cursor:pointer}
 </div>
 
 <div id="active-call-modal" class="call-modal-overlay" style="display:none">
-  <div class="call-card-box">
-    <button class="call-min-btn" onclick="minimizeCallModal()" title="Thu nhỏ">🗕</button>
+  <div class="call-card-box" id="act-card-box">
+    <!-- Video Streams Container -->
+    <div class="call-video-wrap" id="call-video-wrap">
+      <video id="remote-video" class="remote-video" autoplay playsinline></video>
+      <div id="video-remote-placeholder" class="video-remote-placeholder" style="display:none">
+        <div class="call-av" id="video-placeholder-av"></div>
+        <div class="video-placeholder-txt" id="video-placeholder-txt">Đang chờ camera đối phương…</div>
+      </div>
+      <video id="local-video" class="local-video" autoplay playsinline muted></video>
+      <div class="video-overlay-top" id="video-overlay-top">
+        <div class="video-top-info">
+          <span class="video-top-name" id="video-top-name">Người dùng</span>
+          <span class="video-top-timer" id="video-top-timer">00:00</span>
+        </div>
+        <div class="video-top-btns">
+          <button class="video-ctrl-top-btn" id="btn-switch-cam" onclick="switchCallCam()" title="Đổi camera">🔄</button>
+          <button class="video-ctrl-top-btn" id="btn-toggle-fs" onclick="toggleCallFullscreen()" title="Toàn màn hình">⛶</button>
+          <button class="video-ctrl-top-btn" onclick="minimizeCallModal()" title="Thu nhỏ">🗕</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Voice Elements -->
+    <button class="call-min-btn" id="btn-min-voice" onclick="minimizeCallModal()" title="Thu nhỏ">🗕</button>
     <div class="call-pulse-wrap">
       <div class="call-ring" id="act-ring-1"></div>
       <div class="call-ring" id="act-ring-2"></div>
@@ -721,9 +806,12 @@ button{cursor:pointer}
       <div class="call-wave-bar"></div>
       <div class="call-wave-bar"></div>
     </div>
+
+    <!-- Call Control Actions (Voice & Video) -->
     <div class="call-actions">
       <button class="call-btn call-btn-ctrl" id="btn-toggle-mic" onclick="toggleCallMic()" title="Bật/Tắt Micro">🎙️</button>
-      <button class="call-btn call-btn-end" onclick="endVoiceCall(false)" title="Kết thúc cuộc gọi">
+      <button class="call-btn call-btn-ctrl" id="btn-toggle-cam" onclick="toggleCallCam()" title="Bật/Tắt Camera" style="display:none">📹</button>
+      <button class="call-btn call-btn-end" onclick="endCall(false)" title="Kết thúc cuộc gọi">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
           <line x1="18" y1="6" x2="6" y2="18"></line>
           <line x1="6" y1="6" x2="18" y2="18"></line>
@@ -741,7 +829,7 @@ button{cursor:pointer}
   </div>
   <button class="mini-btn" id="mini-btn-mic" onclick="toggleCallMic()" title="Micro">🎙️</button>
   <button class="mini-btn" onclick="restoreCallModal()" title="Mở rộng">🗖</button>
-  <button class="mini-btn end" onclick="endVoiceCall(false)" title="Gác máy">✕</button>
+  <button class="mini-btn end" onclick="endCall(false)" title="Gác máy">✕</button>
 </div>
 
 <script>
@@ -1358,8 +1446,14 @@ function buildBubble(m, isMe){
   const ts=fmtT(m.time), tk=isMe?'<span class="tick">✓✓</span>':'';
   if(m.fileType==='call_ended'||m.fileType==='call_missed'){
     const isMissed=m.fileType==='call_missed';
+    const isVidCall=(m.callType==='video')||(m.text&&m.text.toLowerCase().includes('video'));
+    const icon=isMissed ? (isVidCall?'📹':'📵') : (isVidCall?'📹':'📞');
+    const redialFn=isVidCall ? 'startVideoCall()' : 'startVoiceCall()';
+    const redialTitle=isVidCall ? 'Gọi lại video' : 'Gọi lại';
+    const redialIcon=isVidCall ? '📹' : '📞';
+    const defaultTitle=isMissed ? (isVidCall?'Cuộc gọi video nhỡ':'Cuộc gọi nhỡ') : (isVidCall?'Cuộc gọi video':'Cuộc gọi thoại');
     const w=mkEl('div','bbl call-bbl '+(isMissed?'call-missed':'call-ended'));
-    w.innerHTML=`<div class="call-card-content"><div class="call-card-icon" style="background:${isMissed?'#ffebee':'#e6f7f3'};color:${isMissed?'#ef5350':'#00a884'}">${isMissed?'📵':'📞'}</div><div class="call-card-info"><div class="call-card-title" style="color:${isMissed?'#c62828':'inherit'}">${esc(m.text||(isMissed?'Cuộc gọi nhỡ':'Cuộc gọi thoại'))}</div><div class="call-card-sub">${isMissed?'Cuộc gọi nhỡ':'Đã kết thúc'}</div></div><button class="call-card-cb-btn" onclick="startVoiceCall()" title="Gọi lại">📞</button></div><span class="bt">${ts}${tk}</span>`;
+    w.innerHTML=`<div class="call-card-content"><div class="call-card-icon" style="background:${isMissed?'#ffebee':'#e6f7f3'};color:${isMissed?'#ef5350':'#00a884'}">${icon}</div><div class="call-card-info"><div class="call-card-title" style="color:${isMissed?'#c62828':'inherit'}">${esc(m.text||defaultTitle)}</div><div class="call-card-sub">${isMissed?'Cuộc gọi nhỡ':'Đã kết thúc'}</div></div><button class="call-card-cb-btn" onclick="${redialFn}" title="${redialTitle}">${redialIcon}</button></div><span class="bt">${ts}${tk}</span>`;
     return w;
   }
   if(m.fileType==='file'&&m.fileUrl){
@@ -1679,10 +1773,11 @@ class CallSounds {
 }
 const callSounds = new CallSounds();
 
-// ══════════════ VOICE CALL WEBRTC ══════════════
+// ══════════════ CALL WEBRTC (VOICE & VIDEO) ══════════════
 let callState = {
   active: false,
-  status: 'idle',
+  type: 'voice', // 'voice' | 'video'
+  status: 'idle', // 'idle' | 'calling' | 'incoming' | 'connecting' | 'connected'
   partnerId: null,
   partnerName: '',
   partnerColor: '#00a884',
@@ -1690,21 +1785,35 @@ let callState = {
   isCaller: false,
   startTime: null,
   timerInterval: null,
+  ringTimeout: null,
+  hasMic: true,
   isMuted: false,
+  hasCam: true,
+  isCamOff: false,
+  facingMode: 'user',
   isMinimized: false,
+  isFullscreen: false,
   pendingOfferSdp: null
 };
 let localStream = null;
+let remoteMediaStream = null;
 let peerConn = null;
 let pendingIceCandidates = [];
+let disconnectGraceTimeout = null;
+let micAudioCtx = null;
+let micAnalyser = null;
+let micVisualizerInterval = null;
 
 function createPeerConnection() {
   const pc = new RTCPeerConnection({
     iceServers: [
       { urls: 'stun:stun.l.google.com:19302' },
-      { urls: 'stun:stun1.l.google.com:19302' }
+      { urls: 'stun:stun1.l.google.com:19302' },
+      { urls: 'stun:stun2.l.google.com:19302' },
+      { urls: 'stun:stun.cloudflare.com:3478' }
     ]
   });
+
   pc.onicecandidate = e => {
     if (e.candidate && callState.partnerId) {
       wsSend({
@@ -1714,28 +1823,96 @@ function createPeerConnection() {
       });
     }
   };
+
   pc.ontrack = e => {
+    console.log('[WebRTC] ontrack:', e.track.kind);
+    if (!remoteMediaStream) {
+      remoteMediaStream = new MediaStream();
+    }
+    if (e.streams && e.streams[0]) {
+      e.streams[0].getTracks().forEach(t => {
+        if (!remoteMediaStream.getTracks().includes(t)) {
+          remoteMediaStream.addTrack(t);
+        }
+      });
+    } else if (e.track) {
+      if (!remoteMediaStream.getTracks().includes(e.track)) {
+        remoteMediaStream.addTrack(e.track);
+      }
+    }
+
     const audioEl = document.getElementById('remote-audio');
-    if (audioEl && e.streams[0]) {
-      audioEl.srcObject = e.streams[0];
-      audioEl.play().catch(err => console.log('Remote audio play:', err));
+    const videoEl = document.getElementById('remote-video');
+    const phBox = document.getElementById('video-remote-placeholder');
+
+    if (callState.type === 'video') {
+      if (audioEl) audioEl.muted = true;
+      if (videoEl) {
+        if (videoEl.srcObject !== remoteMediaStream) {
+          videoEl.srcObject = remoteMediaStream;
+        }
+        videoEl.muted = false;
+        videoEl.play().catch(err => console.log('Remote video play error:', err));
+        videoEl.onplaying = () => { if (phBox) phBox.style.display = 'none'; };
+        videoEl.onloadedmetadata = () => { if (phBox) phBox.style.display = 'none'; };
+      }
+    } else {
+      if (audioEl) {
+        audioEl.muted = false;
+        if (audioEl.srcObject !== remoteMediaStream) {
+          audioEl.srcObject = remoteMediaStream;
+        }
+        audioEl.play().catch(err => console.log('Remote audio play error:', err));
+      }
     }
   };
+
   pc.onconnectionstatechange = () => {
+    console.log('[WebRTC] connectionState:', pc.connectionState);
     if (pc.connectionState === 'connected') {
+      if (disconnectGraceTimeout) {
+        clearTimeout(disconnectGraceTimeout);
+        disconnectGraceTimeout = null;
+      }
       onCallConnected();
-    } else if (pc.connectionState === 'disconnected' || pc.connectionState === 'failed') {
-      endVoiceCall(false, 'Kết nối cuộc gọi bị gián đoạn');
+    } else if (pc.connectionState === 'disconnected') {
+      if (!disconnectGraceTimeout) {
+        console.warn('[WebRTC] Tạm thời mất kết nối, đang chờ tự kết nối lại...');
+        disconnectGraceTimeout = setTimeout(() => {
+          if (peerConn && (peerConn.connectionState === 'disconnected' || peerConn.connectionState === 'failed')) {
+            endCall(false, 'Kết nối cuộc gọi bị gián đoạn do mất mạng');
+          }
+        }, 8000);
+      }
+    } else if (pc.connectionState === 'failed') {
+      endCall(false, 'Không thể thiết lập kết nối cuộc gọi');
     }
   };
+
+  pc.oniceconnectionstatechange = () => {
+    console.log('[WebRTC] iceConnectionState:', pc.iceConnectionState);
+    if (pc.iceConnectionState === 'connected' || pc.iceConnectionState === 'completed') {
+      if (disconnectGraceTimeout) {
+        clearTimeout(disconnectGraceTimeout);
+        disconnectGraceTimeout = null;
+      }
+      onCallConnected();
+    }
+  };
+
   return pc;
 }
 
 async function handleRemoteIce(candidate) {
-  if (!peerConn) return;
-  if (peerConn.remoteDescription && peerConn.remoteDescription.type) {
-    try { await peerConn.addIceCandidate(new RTCIceCandidate(candidate)); }
-    catch (e) { console.warn('addIceCandidate error:', e); }
+  if (!candidate) return;
+  if (peerConn && peerConn.remoteDescription && peerConn.remoteDescription.type) {
+    try {
+      if (candidate.candidate) {
+        await peerConn.addIceCandidate(new RTCIceCandidate(candidate));
+      }
+    } catch (e) {
+      console.warn('addIceCandidate error:', e);
+    }
   } else {
     pendingIceCandidates.push(candidate);
   }
@@ -1745,9 +1922,78 @@ async function flushIceCandidates() {
   if (!peerConn) return;
   while (pendingIceCandidates.length > 0) {
     const cand = pendingIceCandidates.shift();
-    try { await peerConn.addIceCandidate(new RTCIceCandidate(cand)); }
-    catch (e) { console.warn('flush candidate error:', e); }
+    try {
+      if (cand && cand.candidate) {
+        await peerConn.addIceCandidate(new RTCIceCandidate(cand));
+      }
+    } catch (e) {
+      console.warn('flush candidate error:', e);
+    }
   }
+}
+
+function startMicVisualizer(stream) {
+  stopMicVisualizer();
+  try {
+    if (!stream) return;
+    const audioTrack = stream.getAudioTracks()[0];
+    if (!audioTrack) return;
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    if (!AudioCtx) return;
+    micAudioCtx = new AudioCtx();
+    if (micAudioCtx.state === 'suspended') {
+      micAudioCtx.resume().catch(() => {});
+    }
+    const source = micAudioCtx.createMediaStreamSource(new MediaStream([audioTrack]));
+    micAnalyser = micAudioCtx.createAnalyser();
+    micAnalyser.fftSize = 32;
+    micAnalyser.smoothingTimeConstant = 0.4;
+    source.connect(micAnalyser);
+
+    const dataArray = new Uint8Array(micAnalyser.frequencyBinCount);
+    const waveBars = document.querySelectorAll('.call-wave-bar');
+
+    micVisualizerInterval = setInterval(() => {
+      if (!micAnalyser || callState.isMuted) {
+        waveBars.forEach(b => {
+          b.style.height = '6px';
+          b.style.background = '#8696a0';
+        });
+        return;
+      }
+      micAnalyser.getByteFrequencyData(dataArray);
+      let sum = 0;
+      for (let i = 0; i < dataArray.length; i++) sum += dataArray[i];
+      const avg = sum / dataArray.length;
+
+      waveBars.forEach((b, idx) => {
+        const val = dataArray[idx % dataArray.length] || avg;
+        const norm = Math.min(1, val / 130);
+        const h = Math.max(6, Math.min(28, Math.round(6 + norm * 22)));
+        b.style.height = h + 'px';
+        b.style.background = norm > 0.08 ? '#00a884' : 'rgba(255,255,255,0.4)';
+      });
+    }, 70);
+  } catch (err) {
+    console.warn('startMicVisualizer error:', err);
+  }
+}
+
+function stopMicVisualizer() {
+  if (micVisualizerInterval) {
+    clearInterval(micVisualizerInterval);
+    micVisualizerInterval = null;
+  }
+  if (micAudioCtx) {
+    try { micAudioCtx.close(); } catch(_) {}
+    micAudioCtx = null;
+    micAnalyser = null;
+  }
+  const waveBars = document.querySelectorAll('.call-wave-bar');
+  waveBars.forEach(b => {
+    b.style.height = '6px';
+    b.style.background = '';
+  });
 }
 
 function createSyntheticAudioStream() {
@@ -1755,10 +2001,11 @@ function createSyntheticAudioStream() {
     const AudioCtx = window.AudioContext || window.webkitAudioContext;
     if (!AudioCtx) return null;
     const ctx = new AudioCtx();
+    if (ctx.state === 'suspended') ctx.resume().catch(() => {});
     const osc = ctx.createOscillator();
     const dst = ctx.createMediaStreamDestination();
     const gain = ctx.createGain();
-    gain.gain.value = 0; // hoàn toàn im lặng
+    gain.gain.value = 0;
     osc.connect(gain);
     gain.connect(dst);
     osc.start();
@@ -1769,65 +2016,124 @@ function createSyntheticAudioStream() {
   }
 }
 
-async function getAudioStreamWithFallback() {
-  if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+async function getMediaStreamWithFallback(isVideo = false, facing = 'user') {
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    if (!window.isSecureContext && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') {
+      toast('⚠️ Micro/Camera yêu cầu HTTPS hoặc localhost trên trình duyệt!');
+    }
+    const synth = createSyntheticAudioStream();
+    return { stream: synth, hasMic: false, hasCam: false, isVideoFallback: false };
+  }
+
+  if (isVideo) {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
-        audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true
-        },
-        video: false
+        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+        video: { facingMode: { ideal: facing }, width: { ideal: 1280 }, height: { ideal: 720 } }
       });
-      return { stream, hasMic: true };
-    } catch (err) {
-      console.warn('getUserMedia error:', err.name, err.message);
-      const synth = createSyntheticAudioStream();
-      return {
-        stream: synth,
-        hasMic: false,
-        errorName: err.name,
-        errorMsg: err.message
-      };
+      return { stream, hasMic: true, hasCam: true, isVideoFallback: false };
+    } catch (err1) {
+      console.warn('Video constraints fall back to basic video+audio:', err1);
+      try {
+        const stream2 = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
+        return { stream: stream2, hasMic: true, hasCam: true, isVideoFallback: false };
+      } catch (err2) {
+        console.warn('Video acquisition failed, trying audio only:', err2);
+        try {
+          const audioStream = await navigator.mediaDevices.getUserMedia({
+            audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }
+          });
+          toast('⚠️ Không mở được camera. Đã chuyển sang cuộc gọi thoại!');
+          return { stream: audioStream, hasMic: true, hasCam: false, isVideoFallback: true };
+        } catch (aErr1) {
+          try {
+            const audioStream2 = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+            toast('⚠️ Không mở được camera. Đã chuyển sang cuộc gọi thoại!');
+            return { stream: audioStream2, hasMic: true, hasCam: false, isVideoFallback: true };
+          } catch (aErr2) {
+            console.warn('Audio fallback also failed:', aErr2);
+            const synth = createSyntheticAudioStream();
+            return { stream: synth, hasMic: false, hasCam: false, isVideoFallback: true, errorName: aErr2.name };
+          }
+        }
+      }
     }
   }
-  const synth = createSyntheticAudioStream();
-  return { stream: synth, hasMic: false, errorName: 'NotSupportedError' };
+
+  // Cuộc gọi thoại
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+      video: false
+    });
+    return { stream, hasMic: true, hasCam: false, isVideoFallback: false };
+  } catch (err1) {
+    console.warn('Enhanced audio failed, trying simple audio: true:', err1);
+    try {
+      const stream2 = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+      return { stream: stream2, hasMic: true, hasCam: false, isVideoFallback: false };
+    } catch (err2) {
+      console.warn('getUserMedia Audio error:', err2.name, err2.message);
+      const synth = createSyntheticAudioStream();
+      return { stream: synth, hasMic: false, hasCam: false, isVideoFallback: false, errorName: err2.name };
+    }
+  }
 }
 
-async function startVoiceCall() {
+async function startCall(type = 'voice') {
   if (!activeId) return toast('Chọn cuộc trò chuyện trước!');
   const cv = convMap[activeId];
   if (!cv) return;
   if (cv.type === 'group') {
-    return toast('ℹ️ Tính năng gọi thoại hiện hỗ trợ cuộc gọi 1-1 với bạn bè!');
+    return toast(`ℹ️ Tính năng gọi ${type === 'video' ? 'video' : 'thoại'} hiện hỗ trợ cuộc gọi 1-1 với bạn bè!`);
   }
   const f = friends.find(x => x.id === cv.partnerId);
   if (!f) return toast('Không tìm thấy thông tin bạn bè!');
   if (!f.online) return toast('⚠️ ' + f.displayName + ' hiện không online!');
   if (callState.active) return toast('Bạn đang trong cuộc gọi khác!');
 
-  const audioRes = await getAudioStreamWithFallback();
-  if (!audioRes.stream) {
-    return toast('❌ Thiết bị không hỗ trợ âm thanh WebRTC!');
+  // Pre-unlock audio element
+  const audioEl = document.getElementById('remote-audio');
+  if (audioEl) audioEl.play().catch(() => {});
+
+  const mediaRes = await getMediaStreamWithFallback(type === 'video', callState.facingMode);
+  if (!mediaRes.stream) {
+    return toast('❌ Thiết bị không hỗ trợ kết nối WebRTC!');
   }
 
-  localStream = audioRes.stream;
+  const actualType = (type === 'video' && !mediaRes.isVideoFallback) ? 'video' : 'voice';
+
+  localStream = mediaRes.stream;
+  remoteMediaStream = null;
   callState.active = true;
+  callState.type = actualType;
   callState.status = 'calling';
   callState.partnerId = f.id;
   callState.partnerName = f.displayName;
   callState.partnerColor = f.color;
   callState.convId = activeId;
   callState.isCaller = true;
-  callState.hasMic = audioRes.hasMic;
-  callState.isMuted = !audioRes.hasMic;
+  callState.hasMic = mediaRes.hasMic;
+  callState.isMuted = !mediaRes.hasMic;
+  callState.hasCam = mediaRes.hasCam;
+  callState.isCamOff = !mediaRes.hasCam;
   callState.isMinimized = false;
   pendingIceCandidates = [];
 
   peerConn = createPeerConnection();
   localStream.getTracks().forEach(track => peerConn.addTrack(track, localStream));
+
+  if (actualType === 'video') {
+    const locVid = document.getElementById('local-video');
+    if (locVid) {
+      locVid.srcObject = localStream;
+      locVid.play().catch(() => {});
+    }
+  }
+
+  if (mediaRes.hasMic) {
+    startMicVisualizer(localStream);
+  }
 
   const offer = await peerConn.createOffer();
   await peerConn.setLocalDescription(offer);
@@ -1836,23 +2142,35 @@ async function startVoiceCall() {
     type: 'CALL_OFFER',
     targetUserId: f.id,
     convId: activeId,
+    callType: actualType,
     sdp: offer
   });
 
   showActiveCallModal();
-  updateCallStatusText(audioRes.hasMic ? 'Đang đổ chuông…' : 'Đang đổ chuông… (Chế độ chỉ nghe 🎧)');
+  updateCallStatusText(mediaRes.hasMic ? 'Đang đổ chuông…' : 'Đang đổ chuông… (Chế độ chỉ nghe 🎧)');
   callSounds.playRingback();
 
-  if (!audioRes.hasMic) {
-    if (audioRes.errorName === 'NotFoundError' || audioRes.errorName === 'DevicesNotFoundError') {
-      toast('🎧 Máy tính chưa cắm micro. Cuộc gọi đang ở chế độ "Chỉ nghe"!');
-    } else if (audioRes.errorName === 'NotAllowedError' || audioRes.errorName === 'PermissionDeniedError') {
-      toast('🎧 Chưa cấp quyền micro (bấm 🔒 trên thanh URL). Cuộc gọi đang ở chế độ "Chỉ nghe"!');
+  clearTimeout(callState.ringTimeout);
+  callState.ringTimeout = setTimeout(() => {
+    if (callState.status === 'calling') {
+      toast('⚠️ Người nhận không trả lời');
+      endCall(false);
+    }
+  }, 45000);
+
+  if (!mediaRes.hasMic) {
+    if (mediaRes.errorName === 'NotFoundError' || mediaRes.errorName === 'DevicesNotFoundError') {
+      toast('🎧 Chưa phát hiện micro. Cuộc gọi đang ở chế độ "Chỉ nghe"!');
+    } else if (mediaRes.errorName === 'NotAllowedError' || mediaRes.errorName === 'PermissionDeniedError') {
+      toast('🎧 Chưa cấp quyền micro (bấm 🔒 trên thanh URL). Cuộc gọi ở chế độ "Chỉ nghe"!');
     } else {
       toast('🎧 Đang kết nối cuộc gọi ở chế độ "Chỉ nghe"!');
     }
   }
 }
+
+function startVoiceCall() { startCall('voice'); }
+function startVideoCall() { startCall('video'); }
 
 function onIncomingCall(m) {
   if (callState.active) {
@@ -1863,7 +2181,9 @@ function onIncomingCall(m) {
     });
   }
 
+  const isVideo = m.callType === 'video';
   callState.active = true;
+  callState.type = isVideo ? 'video' : 'voice';
   callState.status = 'incoming';
   callState.partnerId = m.fromUserId;
   callState.partnerName = m.callerName;
@@ -1871,36 +2191,71 @@ function onIncomingCall(m) {
   callState.convId = m.convId;
   callState.isCaller = false;
   callState.pendingOfferSdp = m.sdp;
-  pendingIceCandidates = [];
+
+  const stEl = document.getElementById('inc-call-status');
+  if (stEl) {
+    stEl.textContent = isVideo ? '📹 ZapChat • Cuộc gọi video đến…' : '📞 ZapChat • Cuộc gọi thoại đến…';
+  }
 
   showIncomingCallModal();
   callSounds.playRingtone();
+
+  clearTimeout(callState.ringTimeout);
+  callState.ringTimeout = setTimeout(() => {
+    if (callState.status === 'incoming') {
+      rejectIncomingCall('timeout');
+    }
+  }, 45000);
 }
 
 async function acceptIncomingCall() {
+  clearTimeout(callState.ringTimeout);
   callSounds.stop();
   hideIncomingCallModal();
 
-  const audioRes = await getAudioStreamWithFallback();
-  if (!audioRes.stream) {
-    toast('❌ Thiết bị không hỗ trợ âm thanh WebRTC!');
+  // Pre-unlock audio element
+  const audioEl = document.getElementById('remote-audio');
+  if (audioEl) audioEl.play().catch(() => {});
+
+  const isVideo = callState.type === 'video';
+  const mediaRes = await getMediaStreamWithFallback(isVideo, callState.facingMode);
+  if (!mediaRes.stream) {
+    toast('❌ Thiết bị không hỗ trợ kết nối WebRTC!');
     rejectIncomingCall();
     return;
   }
 
-  localStream = audioRes.stream;
-  callState.hasMic = audioRes.hasMic;
-  callState.isMuted = !audioRes.hasMic;
+  if (isVideo && mediaRes.isVideoFallback) {
+    callState.type = 'voice';
+  }
+
+  localStream = mediaRes.stream;
+  remoteMediaStream = null;
+  callState.hasMic = mediaRes.hasMic;
+  callState.isMuted = !mediaRes.hasMic;
+  callState.hasCam = mediaRes.hasCam;
+  callState.isCamOff = !mediaRes.hasCam;
   callState.status = 'connecting';
+
   showActiveCallModal();
-  updateCallStatusText(audioRes.hasMic ? 'Đang kết nối…' : 'Đang kết nối… (Chỉ nghe 🎧)');
+  updateCallStatusText(mediaRes.hasMic ? 'Đang kết nối…' : 'Đang kết nối… (Chỉ nghe 🎧)');
 
   peerConn = createPeerConnection();
   localStream.getTracks().forEach(track => peerConn.addTrack(track, localStream));
 
-  await peerConn.setRemoteDescription(new RTCSessionDescription(callState.pendingOfferSdp));
-  await flushIceCandidates();
+  if (callState.type === 'video') {
+    const locVid = document.getElementById('local-video');
+    if (locVid) {
+      locVid.srcObject = localStream;
+      locVid.play().catch(() => {});
+    }
+  }
 
+  if (mediaRes.hasMic) {
+    startMicVisualizer(localStream);
+  }
+
+  await peerConn.setRemoteDescription(new RTCSessionDescription(callState.pendingOfferSdp));
   const answer = await peerConn.createAnswer();
   await peerConn.setLocalDescription(answer);
 
@@ -1910,27 +2265,30 @@ async function acceptIncomingCall() {
     sdp: answer
   });
 
+  await flushIceCandidates();
   onCallConnected();
 
-  if (!audioRes.hasMic) {
+  if (!mediaRes.hasMic) {
     toast('🎧 Đã kết nối ở chế độ "Chỉ nghe" (chưa có micro)');
   }
 }
 
-function rejectIncomingCall() {
+function rejectIncomingCall(reason = 'declined') {
+  clearTimeout(callState.ringTimeout);
   callSounds.stop();
   hideIncomingCallModal();
   if (callState.partnerId) {
     wsSend({
       type: 'CALL_REJECT',
       targetUserId: callState.partnerId,
-      reason: 'declined'
+      reason
     });
   }
   resetCallState();
 }
 
 async function onCallAnswered(m) {
+  clearTimeout(callState.ringTimeout);
   callSounds.stop();
   callSounds.playConnected();
   if (!peerConn) return;
@@ -1946,38 +2304,52 @@ function onCallIceMsg(m) {
 }
 
 function onCallRejected(m) {
+  clearTimeout(callState.ringTimeout);
   callSounds.stop();
   callSounds.playEnd();
-  toast(m.reason === 'busy' ? '⚠️ Người nhận đang bận cuộc gọi khác!' : '📵 Cuộc gọi bị từ chối');
-  endVoiceCall(true);
+  toast(m.reason === 'busy' ? '⚠️ Người nhận đang bận cuộc gọi khác!' : (m.reason === 'timeout' ? '⏱️ Cuộc gọi không có phản hồi' : '📵 Cuộc gọi bị từ chối'));
+  endCall(true);
 }
 
 function onCallEnded(m) {
+  clearTimeout(callState.ringTimeout);
   callSounds.stop();
   callSounds.playEnd();
-  toast('📞 Cuộc gọi thoại đã kết thúc');
-  endVoiceCall(true);
+  const label = (m.callType === 'video' || callState.type === 'video') ? 'Cuộc gọi video' : 'Cuộc gọi thoại';
+  toast(`📞 ${label} đã kết thúc`);
+  endCall(true);
 }
 
 function onCallFailed(m) {
+  clearTimeout(callState.ringTimeout);
   callSounds.stop();
   toast('❌ ' + (m.error || 'Cuộc gọi thất bại!'));
-  endVoiceCall(true);
+  endCall(true);
 }
 
 function onCallBusy(m) {
+  clearTimeout(callState.ringTimeout);
   callSounds.stop();
   toast('⚠️ ' + (m.error || 'Người nhận đang bận!'));
-  endVoiceCall(true);
+  endCall(true);
 }
 
 function onCallConnected() {
   if (callState.status === 'connected') return;
+  clearTimeout(callState.ringTimeout);
+  if (disconnectGraceTimeout) {
+    clearTimeout(disconnectGraceTimeout);
+    disconnectGraceTimeout = null;
+  }
   callState.status = 'connected';
   callState.startTime = Date.now();
-  updateCallStatusText('Đang kết nối');
-  document.getElementById('act-call-timer').style.display = 'block';
-  document.getElementById('act-call-waves').classList.add('active');
+  updateCallStatusText(callState.hasMic ? 'Đang đàm thoại' : 'Đang đàm thoại (Chỉ nghe 🎧)');
+  const timerEl = document.getElementById('act-call-timer');
+  if (timerEl) timerEl.style.display = 'block';
+  if (callState.type === 'voice') {
+    const wavesEl = document.getElementById('act-call-waves');
+    if (wavesEl) wavesEl.classList.add('active');
+  }
   startCallTimer();
 }
 
@@ -1993,6 +2365,8 @@ function startCallTimer() {
     if (tEl) tEl.textContent = text;
     const mtEl = document.getElementById('mini-call-timer');
     if (mtEl) mtEl.textContent = text;
+    const vtEl = document.getElementById('video-top-timer');
+    if (vtEl) vtEl.textContent = text;
   };
   updateTimer();
   callState.timerInterval = setInterval(updateTimer, 1000);
@@ -2013,16 +2387,25 @@ async function toggleCallMic() {
         const audioSender = senders.find(s => s.track && s.track.kind === 'audio');
         if (audioSender) {
           await audioSender.replaceTrack(newTrack);
+        } else {
+          peerConn.addTrack(newTrack, localStream || realStream);
         }
       }
-      localStream = realStream;
+      if (localStream) {
+        const oldAudios = localStream.getAudioTracks();
+        oldAudios.forEach(t => { t.stop(); localStream.removeTrack(t); });
+        localStream.addTrack(newTrack);
+      } else {
+        localStream = realStream;
+      }
       callState.hasMic = true;
       callState.isMuted = false;
       const btn = document.getElementById('btn-toggle-mic');
       if (btn) { btn.classList.remove('muted'); btn.textContent = '🎙️'; btn.title = 'Tắt Micro'; }
       const miniBtn = document.getElementById('mini-btn-mic');
       if (miniBtn) { miniBtn.textContent = '🎙️'; miniBtn.style.color = '#fff'; }
-      updateCallStatusText('Đang kết nối');
+      updateCallStatusText('Đang đàm thoại');
+      startMicVisualizer(localStream);
       return toast('✅ Đã kết nối micro thành công!');
     } catch (e) {
       if (e.name === 'NotFoundError' || e.name === 'DevicesNotFoundError') {
@@ -2039,7 +2422,7 @@ async function toggleCallMic() {
   const audioTracks = localStream.getAudioTracks();
   if (audioTracks.length === 0) return;
   callState.isMuted = !callState.isMuted;
-  audioTracks[0].enabled = !callState.isMuted;
+  audioTracks.forEach(t => t.enabled = !callState.isMuted);
 
   const btn = document.getElementById('btn-toggle-mic');
   if (btn) {
@@ -2052,10 +2435,80 @@ async function toggleCallMic() {
     miniBtn.textContent = callState.isMuted ? '🔇' : '🎙️';
     miniBtn.style.color = callState.isMuted ? '#ef5350' : '#fff';
   }
+  updateCallStatusText(callState.isMuted ? 'Micro đã tắt 🔇' : 'Đang đàm thoại 🎙️');
   toast(callState.isMuted ? 'Đã tắt micro 🔇' : 'Đã bật micro 🎙️');
 }
 
-function endVoiceCall(fromRemote = false, message = null) {
+function toggleCallCam() {
+  if (!localStream) return;
+  const videoTracks = localStream.getVideoTracks();
+  if (videoTracks.length === 0) return toast('⚠️ Không tìm thấy camera!');
+
+  callState.isCamOff = !callState.isCamOff;
+  videoTracks.forEach(t => t.enabled = !callState.isCamOff);
+
+  const btn = document.getElementById('btn-toggle-cam');
+  if (btn) {
+    btn.classList.toggle('off', callState.isCamOff);
+    btn.textContent = callState.isCamOff ? '📷🚫' : '📹';
+    btn.title = callState.isCamOff ? 'Bật Camera' : 'Tắt Camera';
+  }
+  const locVid = document.getElementById('local-video');
+  if (locVid) {
+    locVid.style.opacity = callState.isCamOff ? '0.2' : '1';
+  }
+  toast(callState.isCamOff ? 'Đã tắt camera 📷🚫' : 'Đã bật camera 📹');
+}
+
+async function switchCallCam() {
+  if (callState.type !== 'video' || !localStream) return;
+  callState.facingMode = callState.facingMode === 'user' ? 'environment' : 'user';
+  try {
+    const newStream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: { ideal: callState.facingMode }, width: { ideal: 1280 }, height: { ideal: 720 } }
+    });
+    const newTrack = newStream.getVideoTracks()[0];
+    if (peerConn) {
+      const senders = peerConn.getSenders();
+      const videoSender = senders.find(s => s.track && s.track.kind === 'video');
+      if (videoSender) {
+        await videoSender.replaceTrack(newTrack);
+      }
+    }
+    const oldTracks = localStream.getVideoTracks();
+    oldTracks.forEach(t => {
+      t.stop();
+      localStream.removeTrack(t);
+    });
+    localStream.addTrack(newTrack);
+
+    const locVid = document.getElementById('local-video');
+    if (locVid) {
+      locVid.srcObject = localStream;
+      locVid.style.transform = callState.facingMode === 'user' ? 'scaleX(-1)' : 'none';
+      locVid.play().catch(() => {});
+    }
+    toast('🔄 Đã chuyển camera (' + (callState.facingMode === 'user' ? 'Trước' : 'Sau') + ')');
+  } catch (err) {
+    toast('❌ Không thể đổi camera: ' + err.message);
+  }
+}
+
+function toggleCallFullscreen() {
+  const card = document.getElementById('act-card-box');
+  const btn = document.getElementById('btn-toggle-fs');
+  if (!card) return;
+  callState.isFullscreen = !callState.isFullscreen;
+  card.classList.toggle('fullscreen', callState.isFullscreen);
+  if (btn) btn.textContent = callState.isFullscreen ? '⛷' : '⛶';
+}
+
+function endCall(fromRemote = false, message = null) {
+  clearTimeout(callState.ringTimeout);
+  if (disconnectGraceTimeout) {
+    clearTimeout(disconnectGraceTimeout);
+    disconnectGraceTimeout = null;
+  }
   callSounds.stop();
   if (!fromRemote && callState.partnerId) {
     wsSend({
@@ -2063,6 +2516,8 @@ function endVoiceCall(fromRemote = false, message = null) {
       targetUserId: callState.partnerId
     });
   }
+  stopMicVisualizer();
+
   if (localStream) {
     localStream.getTracks().forEach(t => t.stop());
     localStream = null;
@@ -2071,8 +2526,13 @@ function endVoiceCall(fromRemote = false, message = null) {
     peerConn.close();
     peerConn = null;
   }
+  remoteMediaStream = null;
   const audioEl = document.getElementById('remote-audio');
   if (audioEl) audioEl.srcObject = null;
+  const remVid = document.getElementById('remote-video');
+  if (remVid) remVid.srcObject = null;
+  const locVid = document.getElementById('local-video');
+  if (locVid) locVid.srcObject = null;
 
   hideActiveCallModal();
   hideIncomingCallModal();
@@ -2081,10 +2541,17 @@ function endVoiceCall(fromRemote = false, message = null) {
   resetCallState();
   if (message) toast(message);
 }
+const endVoiceCall = endCall;
 
 function resetCallState() {
+  clearTimeout(callState.ringTimeout);
+  if (disconnectGraceTimeout) {
+    clearTimeout(disconnectGraceTimeout);
+    disconnectGraceTimeout = null;
+  }
   callState = {
     active: false,
+    type: 'voice',
     status: 'idle',
     partnerId: null,
     partnerName: '',
@@ -2093,16 +2560,31 @@ function resetCallState() {
     isCaller: false,
     startTime: null,
     timerInterval: null,
+    ringTimeout: null,
+    hasMic: true,
     isMuted: false,
+    hasCam: true,
+    isCamOff: false,
+    facingMode: 'user',
     isMinimized: false,
+    isFullscreen: false,
     pendingOfferSdp: null
   };
+  pendingIceCandidates = [];
+  const card = document.getElementById('act-card-box');
+  if (card) {
+    card.classList.remove('video-mode', 'fullscreen');
+  }
   const waves = document.getElementById('act-call-waves');
   if (waves) waves.classList.remove('active');
   const timer = document.getElementById('act-call-timer');
   if (timer) { timer.style.display = 'none'; timer.textContent = '00:00'; }
   const micBtn = document.getElementById('btn-toggle-mic');
   if (micBtn) { micBtn.classList.remove('muted'); micBtn.textContent = '🎙️'; }
+  const camBtn = document.getElementById('btn-toggle-cam');
+  if (camBtn) { camBtn.style.display = 'none'; camBtn.classList.remove('off'); camBtn.textContent = '📹'; }
+  const phBox = document.getElementById('video-remote-placeholder');
+  if (phBox) phBox.style.display = 'none';
 }
 
 function showIncomingCallModal() {
@@ -2120,10 +2602,29 @@ function hideIncomingCallModal() {
 
 function showActiveCallModal() {
   const modal = document.getElementById('active-call-modal');
+  const card = document.getElementById('act-card-box');
   const av = document.getElementById('act-call-av');
   const name = document.getElementById('act-call-name');
+  const vName = document.getElementById('video-top-name');
+  const camBtn = document.getElementById('btn-toggle-cam');
+  const phAv = document.getElementById('video-placeholder-av');
+  const phBox = document.getElementById('video-remote-placeholder');
+
   if (av) { av.style.background = callState.partnerColor; av.textContent = ini(callState.partnerName); }
+  if (phAv) { phAv.style.background = callState.partnerColor; phAv.textContent = ini(callState.partnerName); }
   if (name) name.textContent = callState.partnerName;
+  if (vName) vName.textContent = callState.partnerName;
+
+  if (callState.type === 'video') {
+    if (card) card.classList.add('video-mode');
+    if (camBtn) camBtn.style.display = 'flex';
+    if (phBox) phBox.style.display = 'flex';
+  } else {
+    if (card) card.classList.remove('video-mode', 'fullscreen');
+    if (camBtn) camBtn.style.display = 'none';
+    if (phBox) phBox.style.display = 'none';
+  }
+
   if (modal) modal.style.display = 'flex';
   hideCallMiniBar();
 }
@@ -2159,6 +2660,14 @@ function hideCallMiniBar() {
   const bar = document.getElementById('call-mini-bar');
   if (bar) bar.style.display = 'none';
 }
+
+// Bắt sự kiện click để tự động unlock autoplay cho audio/video nếu bị trình duyệt chặn
+document.addEventListener('click', () => {
+  const a = document.getElementById('remote-audio');
+  if (a && a.srcObject && a.paused) a.play().catch(() => {});
+  const v = document.getElementById('remote-video');
+  if (v && v.srcObject && v.paused) v.play().catch(() => {});
+}, { passive: true });
 
 connect();
 if(localStorage.getItem('zapchat_token')){
