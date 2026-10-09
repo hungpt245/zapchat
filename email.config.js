@@ -17,7 +17,7 @@ module.exports = {
 
   // --- Tài khoản gửi email ---
   user: 'hungpt245@gmail.com',
-  pass: 'ncmdcbdiaztlvphf',      // Mật khẩu ứng dụng
+  pass: '',      // Mật khẩu ứng dụng
 
   // --- Tên hiển thị khi gửi ---
   fromName: 'ZapChat',
